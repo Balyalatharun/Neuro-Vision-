@@ -1,18 +1,9 @@
 import { NextResponse } from 'next/server';
-import { createUserWithEmailAndPassword } from 'firebase/auth';
-import { collection, addDoc, query, where, getDocs } from 'firebase/firestore';
-import { auth, db } from '@/lib/firebaseServer';
+import * as admin from 'firebase-admin';
+import { getAdminAuth, getAdminDb } from '@/lib/firebaseAdmin';
 
 export async function POST(req: Request) {
     try {
-        // Validate Firebase is initialized
-        if (!auth || !db) {
-            return NextResponse.json(
-                { detail: 'Firebase not properly configured. Check environment variables.' },
-                { status: 500 }
-            );
-        }
-
         const { full_name, email, password } = await req.json();
 
         if (!full_name || !email || !password) {
@@ -22,50 +13,64 @@ export async function POST(req: Request) {
             );
         }
 
-        // Check if user already exists in Firestore
-        const usersRef = collection(db, 'users');
-        const q = query(usersRef, where('email', '==', email));
-        const querySnapshot = await getDocs(q);
+        // Validate email format
+        const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+        if (!emailRegex.test(email)) {
+            return NextResponse.json(
+                { detail: 'Invalid email address' },
+                { status: 400 }
+            );
+        }
 
-        if (!querySnapshot.empty) {
+        const adminAuth = getAdminAuth();
+        const adminDb = getAdminDb();
+
+        // Check if user already exists in Firestore
+        const usersRef = adminDb.collection('users');
+        const existingUser = await usersRef.where('email', '==', email).get();
+
+        if (!existingUser.empty) {
             return NextResponse.json(
                 { detail: 'User already exists' },
                 { status: 400 }
             );
         }
 
-        // Create user with Firebase Authentication
-        const userCredential = await createUserWithEmailAndPassword(auth, email, password);
-        const user = userCredential.user;
+        // Create user with Firebase Authentication using Admin SDK
+        const userRecord = await adminAuth.createUser({
+            email: email,
+            password: password,
+            displayName: full_name,
+        });
 
         // Store user data in Firestore
-        await addDoc(usersRef, {
-            uid: user.uid,
+        await usersRef.doc(userRecord.uid).set({
+            uid: userRecord.uid,
             full_name,
-            email: user.email,
-            createdAt: new Date(),
-            updatedAt: new Date(),
+            email: userRecord.email,
+            createdAt: admin.firestore.Timestamp.now(),
+            updatedAt: admin.firestore.Timestamp.now(),
         });
 
         return NextResponse.json({
-            uid: user.uid,
+            uid: userRecord.uid,
             full_name,
-            email: user.email,
+            email: userRecord.email,
             detail: "User Registered Successfully"
-        });
+        }, { status: 201 });
 
     } catch (error: any) {
         console.error("Register Error:", error);
 
-        // Handle specific Firebase errors
-        if (error.code === 'auth/email-already-in-use') {
+        // Handle specific Firebase Admin errors
+        if (error.code === 'auth/email-already-exists') {
             return NextResponse.json(
                 { detail: 'Email is already in use' },
                 { status: 400 }
             );
         }
 
-        if (error.code === 'auth/weak-password') {
+        if (error.code === 'auth/invalid-password') {
             return NextResponse.json(
                 { detail: 'Password should be at least 6 characters' },
                 { status: 400 }
@@ -79,12 +84,18 @@ export async function POST(req: Request) {
             );
         }
 
-        if (error.code === 'auth/operation-not-allowed') {
+        if (error.message?.includes('FIREBASE_ADMIN_SDK_KEY')) {
             return NextResponse.json(
-                { detail: 'Email/password authentication is not enabled. Check Firebase Console.' },
+                { detail: 'Server configuration error. Admin SDK not properly configured.' },
                 { status: 500 }
             );
         }
+
+        console.error("Full error:", {
+            code: error.code,
+            message: error.message,
+            stack: error.stack
+        });
 
         return NextResponse.json(
             { detail: error?.message || 'Server Error' },

@@ -1,17 +1,8 @@
 import { NextResponse } from 'next/server';
-import { collection, query, where, getDocs } from 'firebase/firestore';
-import { db } from '@/lib/firebaseServer';
+import { getAdminDb } from '@/lib/firebaseAdmin';
 
 export async function POST(req: Request) {
     try {
-        // Validate Firebase is initialized
-        if (!db) {
-            return NextResponse.json(
-                { detail: 'Firebase not properly configured. Check environment variables.' },
-                { status: 500 }
-            );
-        }
-
         const { email, password } = await req.json();
 
         if (!email || !password) {
@@ -28,7 +19,7 @@ export async function POST(req: Request) {
             );
         }
 
-        // Use Firebase REST API for authentication
+        // Use Firebase REST API for authentication (since we need the password verification)
         const apiKey = process.env.NEXT_PUBLIC_FIREBASE_API_KEY;
         const response = await fetch(
             `https://identitytoolkit.googleapis.com/v1/accounts:signInWithPassword?key=${apiKey}`,
@@ -58,20 +49,20 @@ export async function POST(req: Request) {
         const { localId, idToken, email: userEmail } = data;
 
         // Get user data from Firestore
-        const usersRef = collection(db, 'users');
-        const q = query(usersRef, where('uid', '==', localId));
-        const querySnapshot = await getDocs(q);
+        const adminDb = getAdminDb();
+        const usersRef = adminDb.collection('users');
+        const userDoc = await usersRef.doc(localId).get();
 
         let userData: any = {
             uid: localId,
             email: userEmail,
         };
 
-        if (!querySnapshot.empty) {
-            const userDoc = querySnapshot.docs[0];
+        if (userDoc.exists) {
+            const docData = userDoc.data();
             userData = {
                 ...userData,
-                full_name: userDoc.data().full_name,
+                full_name: docData?.full_name,
             };
         }
 
