@@ -1,24 +1,24 @@
 # Neuro-Vision
 
-A mental health and risk assessment application built with Next.js, React, and MongoDB.
+A mental health and risk assessment application built with Next.js, React, and Firebase.
 
 ## Project Overview
 
 Neuro-Vision is a comprehensive mental health platform that includes:
 
-- **User Authentication**: Secure login and registration
+- **User Authentication**: Secure login and registration via Firebase Auth
 - **Camera Module**: Integration with device camera
 - **Chat Interface**: Real-time chat functionality with AI assistance
 - **Risk Assessment**: Dashboard with risk analysis and charts
 - **Emotion Detection**: AI-powered emotion analysis
+- **Cloud Storage**: Firestore database for user data
 
 ## Getting Started
 
 ### Prerequisites
 - Node.js (v18 or higher)
 - npm or yarn
-- MongoDB URI
-- JWT Secret
+- Firebase Project (get from [firebase.google.com](https://firebase.google.com))
 
 ### Installation
 
@@ -38,7 +38,7 @@ npm install
 # Copy the example environment file
 cp .env.example .env.local
 
-# Edit .env.local and add your configuration
+# Edit .env.local and add your Firebase configuration
 ```
 
 4. Run the development server:
@@ -50,11 +50,19 @@ Open [http://localhost:3000](http://localhost:3000) to view the application.
 
 ## Environment Variables
 
-Create a `.env.local` file with the following variables:
+Create a `.env.local` file with the following Firebase variables:
 
 ```
-MONGO_URI=your_mongodb_uri
-JWT_SECRET=your_jwt_secret
+# Firebase Configuration
+NEXT_PUBLIC_FIREBASE_API_KEY=your_firebase_api_key
+NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN=your_firebase_auth_domain
+NEXT_PUBLIC_FIREBASE_PROJECT_ID=your_firebase_project_id
+NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET=your_firebase_storage_bucket
+NEXT_PUBLIC_FIREBASE_MESSAGING_SENDER_ID=your_firebase_messaging_sender_id
+NEXT_PUBLIC_FIREBASE_APP_ID=your_firebase_app_id
+NEXT_PUBLIC_FIREBASE_MEASUREMENT_ID=your_firebase_measurement_id
+
+# API Configuration
 NEXT_PUBLIC_API_URL=http://localhost:3000/api
 NEXT_PUBLIC_GEMINI_API_KEY=your_gemini_api_key
 NODE_ENV=development
@@ -95,8 +103,13 @@ The easiest way to deploy is using the [Vercel Platform](https://vercel.com):
 2. Go to [https://vercel.com/new](https://vercel.com/new)
 3. Import your GitHub repository
 4. Add environment variables in Vercel dashboard:
-   - `MONGO_URI`
-   - `JWT_SECRET`
+   - `NEXT_PUBLIC_FIREBASE_API_KEY`
+   - `NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN`
+   - `NEXT_PUBLIC_FIREBASE_PROJECT_ID`
+   - `NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET`
+   - `NEXT_PUBLIC_FIREBASE_MESSAGING_SENDER_ID`
+   - `NEXT_PUBLIC_FIREBASE_APP_ID`
+   - `NEXT_PUBLIC_FIREBASE_MEASUREMENT_ID`
    - `NEXT_PUBLIC_GEMINI_API_KEY`
    - `NEXT_PUBLIC_API_URL`
 5. Click Deploy
@@ -124,11 +137,19 @@ vercel --prod
 
 ## Database
 
-This project uses MongoDB. You can:
-- Use MongoDB Atlas (cloud): [https://www.mongodb.com/cloud/atlas](https://www.mongodb.com/cloud/atlas)
-- Use MongoDB Community (local)
+This project uses Firebase services:
 
-Set the `MONGO_URI` in your environment variables.
+- **Authentication**: Firebase Authentication (email/password)
+- **Database**: Cloud Firestore (NoSQL document database)
+- **Storage**: Cloud Storage (for files and images)
+
+### Setup Firebase:
+1. Create a Firebase project at [firebase.google.com](https://firebase.google.com)
+2. Enable Authentication (Email/Password method)
+3. Create a Firestore database
+4. Copy your Firebase config and add to `.env.local`
+
+Set all `NEXT_PUBLIC_FIREBASE_*` variables in your environment.
 
 ## Learn More
 
