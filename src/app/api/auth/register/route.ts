@@ -5,6 +5,14 @@ import { auth, db } from '@/lib/firebaseServer';
 
 export async function POST(req: Request) {
     try {
+        // Validate Firebase is initialized
+        if (!auth || !db) {
+            return NextResponse.json(
+                { detail: 'Firebase not properly configured. Check environment variables.' },
+                { status: 500 }
+            );
+        }
+
         const { full_name, email, password } = await req.json();
 
         if (!full_name || !email || !password) {
@@ -31,7 +39,7 @@ export async function POST(req: Request) {
         const user = userCredential.user;
 
         // Store user data in Firestore
-        const userDocRef = await addDoc(usersRef, {
+        await addDoc(usersRef, {
             uid: user.uid,
             full_name,
             email: user.email,
@@ -68,6 +76,13 @@ export async function POST(req: Request) {
             return NextResponse.json(
                 { detail: 'Invalid email address' },
                 { status: 400 }
+            );
+        }
+
+        if (error.code === 'auth/operation-not-allowed') {
+            return NextResponse.json(
+                { detail: 'Email/password authentication is not enabled. Check Firebase Console.' },
+                { status: 500 }
             );
         }
 

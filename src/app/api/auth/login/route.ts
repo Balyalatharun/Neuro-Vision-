@@ -4,6 +4,14 @@ import { db } from '@/lib/firebaseServer';
 
 export async function POST(req: Request) {
     try {
+        // Validate Firebase is initialized
+        if (!db) {
+            return NextResponse.json(
+                { detail: 'Firebase not properly configured. Check environment variables.' },
+                { status: 500 }
+            );
+        }
+
         const { email, password } = await req.json();
 
         if (!email || !password) {
@@ -13,12 +21,22 @@ export async function POST(req: Request) {
             );
         }
 
+        if (!process.env.NEXT_PUBLIC_FIREBASE_API_KEY) {
+            return NextResponse.json(
+                { detail: 'Firebase API key not configured' },
+                { status: 500 }
+            );
+        }
+
         // Use Firebase REST API for authentication
         const apiKey = process.env.NEXT_PUBLIC_FIREBASE_API_KEY;
         const response = await fetch(
             `https://identitytoolkit.googleapis.com/v1/accounts:signInWithPassword?key=${apiKey}`,
             {
                 method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
                 body: JSON.stringify({
                     email,
                     password,
@@ -29,8 +47,9 @@ export async function POST(req: Request) {
 
         if (!response.ok) {
             const error = await response.json();
+            console.error("Firebase Auth Error:", error);
             return NextResponse.json(
-                { detail: 'Invalid credentials' },
+                { detail: 'Invalid email or password' },
                 { status: 400 }
             );
         }
