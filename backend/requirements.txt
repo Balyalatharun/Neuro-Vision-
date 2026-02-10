@@ -1,0 +1,14 @@
+fastapi
+uvicorn
+pymongo
+python-dotenv
+python-multipart
+python-jose[cryptography]
+passlib[bcrypt]
+bcrypt==4.0.1
+email-validator
+motor
+requests
+# google-generativeai (Moved to Frontend)
+# opencv-python-headless
+# numpy
