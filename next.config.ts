@@ -2,24 +2,8 @@ import type { NextConfig } from "next";
 import path from "path";
 
 const nextConfig: NextConfig = {
-  // Optimize for Vercel deployment
-  swcMinify: true,
-  poweredByHeader: false,
-  compress: true,
-  
-  // Environment variables
-  env: {
-    NEXT_PUBLIC_API_URL: process.env.NEXT_PUBLIC_API_URL || "http://localhost:3000/api",
-  },
-
   turbopack: {
     root: path.join(__dirname),
-  },
-
-  // Vercel specific optimizations
-  onDemandEntries: {
-    maxInactiveAge: 60 * 60 * 1000,
-    pagesBufferLength: 5,
   },
 
   // Headers for security and API configuration
