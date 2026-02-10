@@ -1,5 +1,8 @@
 import { NextResponse } from 'next/server';
-import { getAdminDb } from '@/lib/firebaseAdmin';
+import bcryptjs from 'bcryptjs';
+import jwt from 'jsonwebtoken';
+import { dbConnect } from '@/lib/db';
+import User from '@/models/User';
 
 export async function POST(req: Request) {
     try {
@@ -7,70 +10,51 @@ export async function POST(req: Request) {
 
         if (!email || !password) {
             return NextResponse.json(
-                { detail: 'Please add all fields' },
+                { detail: 'Email and password are required' },
                 { status: 400 }
             );
         }
 
-        if (!process.env.NEXT_PUBLIC_FIREBASE_API_KEY) {
-            return NextResponse.json(
-                { detail: 'Firebase API key not configured' },
-                { status: 500 }
-            );
-        }
+        // Connect to MongoDB
+        await dbConnect();
 
-        // Use Firebase REST API for authentication (since we need the password verification)
-        const apiKey = process.env.NEXT_PUBLIC_FIREBASE_API_KEY;
-        const response = await fetch(
-            `https://identitytoolkit.googleapis.com/v1/accounts:signInWithPassword?key=${apiKey}`,
-            {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                },
-                body: JSON.stringify({
-                    email,
-                    password,
-                    returnSecureToken: true,
-                }),
-            }
-        );
+        // Find user by email
+        const user = await User.findOne({ email: email.toLowerCase() }).select('+password');
 
-        if (!response.ok) {
-            const error = await response.json();
-            console.error("Firebase Auth Error:", error);
+        if (!user) {
             return NextResponse.json(
                 { detail: 'Invalid email or password' },
-                { status: 400 }
+                { status: 401 }
             );
         }
 
-        const data = await response.json();
-        const { localId, idToken, email: userEmail } = data;
+        // Compare passwords
+        const isPasswordCorrect = await bcryptjs.compare(password, user.password);
 
-        // Get user data from Firestore
-        const adminDb = getAdminDb();
-        const usersRef = adminDb.collection('users');
-        const userDoc = await usersRef.doc(localId).get();
-
-        let userData: any = {
-            uid: localId,
-            email: userEmail,
-        };
-
-        if (userDoc.exists) {
-            const docData = userDoc.data();
-            userData = {
-                ...userData,
-                full_name: docData?.full_name,
-            };
+        if (!isPasswordCorrect) {
+            return NextResponse.json(
+                { detail: 'Invalid email or password' },
+                { status: 401 }
+            );
         }
 
+        // Create JWT token
+        const jwtSecret = process.env.JWT_SECRET || 'your-secret-key';
+        const token = jwt.sign(
+            { id: user._id, email: user.email },
+            jwtSecret,
+            { expiresIn: '7d' }
+        );
+
         return NextResponse.json({
-            access_token: idToken,
+            access_token: token,
             token_type: 'bearer',
-            user: userData,
-        });
+            user: {
+                _id: user._id,
+                full_name: user.full_name,
+                email: user.email,
+            }
+        }, { status: 200 });
 
     } catch (error: any) {
         console.error("Login Error:", error);

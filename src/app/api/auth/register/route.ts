@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
-import * as admin from 'firebase-admin';
-import { getAdminAuth, getAdminDb } from '@/lib/firebaseAdmin';
+import bcryptjs from 'bcryptjs';
+import { dbConnect } from '@/lib/db';
+import User from '@/models/User';
 
 export async function POST(req: Request) {
     try {
@@ -22,80 +23,44 @@ export async function POST(req: Request) {
             );
         }
 
-        const adminAuth = getAdminAuth();
-        const adminDb = getAdminDb();
+        // Connect to MongoDB
+        await dbConnect();
 
-        // Check if user already exists in Firestore
-        const usersRef = adminDb.collection('users');
-        const existingUser = await usersRef.where('email', '==', email).get();
-
-        if (!existingUser.empty) {
+        // Check if user already exists
+        const existingUser = await User.findOne({ email: email.toLowerCase() });
+        if (existingUser) {
             return NextResponse.json(
                 { detail: 'User already exists' },
                 { status: 400 }
             );
         }
 
-        // Create user with Firebase Authentication using Admin SDK
-        const userRecord = await adminAuth.createUser({
-            email: email,
-            password: password,
-            displayName: full_name,
-        });
+        // Hash password
+        const hashedPassword = await bcryptjs.hash(password, 10);
 
-        // Store user data in Firestore
-        await usersRef.doc(userRecord.uid).set({
-            uid: userRecord.uid,
+        // Create new user
+        const user = await User.create({
             full_name,
-            email: userRecord.email,
-            createdAt: admin.firestore.Timestamp.now(),
-            updatedAt: admin.firestore.Timestamp.now(),
+            email: email.toLowerCase(),
+            password: hashedPassword,
         });
 
         return NextResponse.json({
-            uid: userRecord.uid,
-            full_name,
-            email: userRecord.email,
+            _id: user._id,
+            full_name: user.full_name,
+            email: user.email,
             detail: "User Registered Successfully"
         }, { status: 201 });
 
     } catch (error: any) {
         console.error("Register Error:", error);
 
-        // Handle specific Firebase Admin errors
-        if (error.code === 'auth/email-already-exists') {
+        if (error.code === 11000) {
             return NextResponse.json(
                 { detail: 'Email is already in use' },
                 { status: 400 }
             );
         }
-
-        if (error.code === 'auth/invalid-password') {
-            return NextResponse.json(
-                { detail: 'Password should be at least 6 characters' },
-                { status: 400 }
-            );
-        }
-
-        if (error.code === 'auth/invalid-email') {
-            return NextResponse.json(
-                { detail: 'Invalid email address' },
-                { status: 400 }
-            );
-        }
-
-        if (error.message?.includes('FIREBASE_ADMIN_SDK_KEY')) {
-            return NextResponse.json(
-                { detail: 'Server configuration error. Admin SDK not properly configured.' },
-                { status: 500 }
-            );
-        }
-
-        console.error("Full error:", {
-            code: error.code,
-            message: error.message,
-            stack: error.stack
-        });
 
         return NextResponse.json(
             { detail: error?.message || 'Server Error' },
